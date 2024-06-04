@@ -1,6 +1,6 @@
-path: C:\Users\elise\Documents\1 UTBM\INFO 4 - DS\TO52\otherdata
-train: images
-val: images
+path: C:\Users\elise\Documents\GitHub\TO52_Clothes_detection2\otherdata3
+train: images\train
+val: images\val
 names:
     0: Anorak
     1: Blazer
