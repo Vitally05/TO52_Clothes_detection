@@ -1,5 +1,4 @@
 import mysql.connector
-import pandas as pd
 import numpy as np
 from ultralytics import YOLO
 from PIL import Image
@@ -8,14 +7,12 @@ from keras.preprocessing import image
 from keras.models import Model
 from sklearn.metrics.pairwise import cosine_similarity
 import os
-import random
-import matplotlib.pyplot as plt
-import matplotlib.image as mpimg
 import shutil
+import cv2
 
 yolo_model_path ='runs/detect/train2/weights/best.pt'
 destination_path = 'runs/find/'
-origin_path = 'data/'
+origin_path = 'data/cropped/'
 LIMIT = 100
 
 
@@ -139,26 +136,41 @@ def crop_image(image_path, bbox):
 
 
 def extract_features(img_path, model):
+    # Extraction des caractéristiques avec VGG16
     img = image.load_img(img_path, target_size=(224, 224))
     img_data = image.img_to_array(img)
     img_data = np.expand_dims(img_data, axis=0)
     img_data = preprocess_input(img_data)
     vgg16_feature = model.predict(img_data)
-    return vgg16_feature
+
+    # Extraction de l'histogramme de couleurs
+    img_bgr = cv2.imread(img_path)
+    img_hsv = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2HSV)
+    hist_h = cv2.calcHist([img_hsv], [0], None, [50], [0, 256])
+    hist_s = cv2.calcHist([img_hsv], [1], None, [60], [0, 256])
+    hist_v = cv2.calcHist([img_hsv], [2], None, [60], [0, 256])
+    hist_h = cv2.normalize(hist_h, hist_h).flatten()
+    hist_s = cv2.normalize(hist_s, hist_s).flatten()
+    hist_v = cv2.normalize(hist_v, hist_v).flatten()
+    color_hist = np.concatenate((hist_h, hist_s, hist_v))
+
+    return vgg16_feature, color_hist
 
 def get_similar_images(paths, goal, limite):
     similarities = [0 for i in range(len(paths))]
     i = 0
     base_model = VGG16(weights='imagenet')
     model = Model(inputs=base_model.input, outputs=base_model.get_layer('fc1').output)
-    new_image_features = extract_features(goal, model)
+    new_image_features, new_image_color_hist = extract_features(goal, model)
     for path in paths:
-        feature = extract_features(path, model)
-        similarity = cosine_similarity(new_image_features, feature).tolist()[0][0]
-        similarity = round(similarity, 4)
-        print(f"Similarité  : {similarity}")
-        similarities[i] = similarity
-        name = str(similarity).replace("0.", "")
+        feature, color_hist = extract_features(path, model)
+        similarity_features = cosine_similarity(new_image_features, feature).tolist()[0][0]
+        similarity_color = cv2.compareHist(new_image_color_hist, color_hist, cv2.HISTCMP_CORREL)
+        combined_similarity = (similarity_features + similarity_color) / 2
+        combined_similarity = round(combined_similarity, 4)
+        print(f"Similarité combinée : {combined_similarity}")
+        similarities[i] = combined_similarity
+        name = str(combined_similarity).replace("0.", "")
         shutil.copy2(path, "./runs/find/" + name + '.jpg')
         i += 1
     indices = np.argsort(similarities)[::-1][:limite]
