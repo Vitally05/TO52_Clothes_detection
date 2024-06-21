@@ -10,7 +10,7 @@ import os
 import shutil
 import cv2
 
-yolo_model_path ='runs/detect/train2/weights/best.pt'
+yolo_model_path ='runs/detect/train6/weights/best.pt'
 destination_path = 'runs/find/'
 origin_path = 'data/cropped/'
 LIMIT = 100
@@ -43,8 +43,8 @@ def create_connection_bdd():
 
 
 def construct_query(cat, brand, size):
-    query = "SELECT absolute_path FROM clothes NATURAL JOIN category cat "
-    where_category = f"WHERE cat.id_category = {cat} "
+    query = "SELECT absolute_path FROM clothes "
+    where_category = f"WHERE clothes.id_category = {cat} "
     where_brand = ""
     where_size = ""
     first = True
@@ -72,7 +72,7 @@ def construct_query(cat, brand, size):
         if len(size) > 0:
             where_size = where_size + ") "
 
-    query = query + where_category + where_brand + where_size + "LIMIT " + str(LIMIT)
+    query = query + where_category + where_brand + where_size + "ORDER BY RAND() LIMIT " + str(LIMIT)
 
     return query
 
@@ -94,6 +94,16 @@ def get_brands_bdd():
     brands = [brand[0] for brand in brands]
     cnx.close()
     return brands
+
+def get_size_and_brand(path):
+    cnx = create_connection_bdd()
+    cursor = cnx.cursor()
+    cursor.execute(f"SELECT size.size FROM clothes NATURAL JOIN size WHERE absolute_path = '{path}' ;")
+    size= cursor.fetchall()
+    cursor.execute(f"SELECT brand.brand FROM clothes NATURAL JOIN brand WHERE absolute_path = '{path}' ;")
+    brand= cursor.fetchall()
+    cnx.close()
+    return size[0][0], brand[0][0]
 
 def get_images_bdd(cat, brand, size):
     cnx = create_connection_bdd()
@@ -120,8 +130,10 @@ def predict_category(image_path):
     model = YOLO(yolo_model_path)
     results = model.predict(source=image_path, save=True)
     for result in results:
-        classe = result.boxes.cls  # class, (N, )
-        bounding_box = result.boxes.xyxy[0]
+        if len(result.boxes) == 0:
+            return None, None
+        classe = result.boxes[0].cls  # class, (N, )
+        bounding_box = result.boxes[0].xyxy[0]
         bbox = bounding_box.tolist()
         cat = int(classe.item())
     return cat, bbox
@@ -175,4 +187,14 @@ def get_similar_images(paths, goal, limite):
         i += 1
     indices = np.argsort(similarities)[::-1][:limite]
     new_paths = [[paths[i], similarities[i]] for i in indices]
-    return new_paths
+    best_paths = get_infos_bdd(new_paths)
+    return best_paths
+
+def get_infos_bdd(paths):
+    for path in paths:
+        size, brand = get_size_and_brand(path[0].replace('data/cropped/', ""))
+        path.append(size)
+        path.append(brand)
+    print(paths)
+    return paths
+

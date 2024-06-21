@@ -17,7 +17,6 @@ class ClothesFinderApp:
         self.similar_count_entry = None
 
 
-
     def create_widgets(self, sizes, brands):
         # Image Selection
         image_frame = tk.Frame(self.root)
@@ -120,12 +119,15 @@ class ClothesFinderApp:
             if similar_count is not None:
                 print(f"Finding {similar_count} similar items...")
                 self.category, bbox = util.predict_category(self.selected_image_path)
-                self.selected_image_path = util.crop_image(self.selected_image_path, bbox)
-                paths = util.get_images_bdd(self.category, selected_brands, selected_sizes)
-                new_paths = util.get_similar_images(paths, self.selected_image_path, similar_count)
-                self.show_results(new_paths)
+                if bbox is None:
+                    messagebox.showerror("Error", "No clothes detected in the image. Please choose another image.")
+                else:
+                    self.selected_image_path = util.crop_image(self.selected_image_path, bbox)
+                    paths = util.get_images_bdd(self.category, selected_brands, selected_sizes)
+                    result = util.get_similar_images(paths, self.selected_image_path, similar_count)
+                    self.show_results(result)
 
-    def show_results(self, results_paths):
+    def show_results(self, results):
         # Results Area
         results_window = tk.Toplevel(self.root)
         results_frame = tk.Frame(results_window)
@@ -158,13 +160,15 @@ class ClothesFinderApp:
 
         images = []  # List to hold image references to avoid garbage collection
 
-        for index, img_path in enumerate(results_paths):
+        for index, img_path in enumerate(results):
             img = Image.open(img_path[0])
             img.thumbnail((self.width, self.height))  # Resize image
             img = ImageTk.PhotoImage(img)
             images.append(img)  # Append to the list to keep a reference
             percent = round(img_path[1]*100, 2)
             description = "Taux de similarité : " + str(percent) + "%"
+            size = "Taille : " + img_path[2]
+            brand = "Marque : " + img_path[3]
 
             row = index % 2
             col = index // 2
@@ -177,8 +181,12 @@ class ClothesFinderApp:
             img_label.pack()
 
             # Add the description below the image
-            desc_label = tk.Label(frame, text=description, wraplength=self.width, justify="center")
-            desc_label.pack()
+            desc_label_percent = tk.Label(frame, text=description, wraplength=self.width, justify="center")
+            desc_label_percent.pack()
+            desc_label_size = tk.Label(frame, text=size, wraplength=self.width, justify="center")
+            desc_label_size.pack()
+            desc_label_brand = tk.Label(frame, text=brand, wraplength=self.width, justify="center")
+            desc_label_brand.pack()
 
         results_window.images = images  # Store the image references in the window to avoid garbage collection
 

@@ -1,4 +1,4 @@
-path: C:\Users\elise\Documents\GitHub\TO52_Clothes_detection2\otherdata
+path: C:\Users\elise\Documents\GitHub\TO52_Clothes_detection2\otherdata5
 train: images\train
 val: images\val
 names:
