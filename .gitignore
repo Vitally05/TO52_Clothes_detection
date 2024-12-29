@@ -1,6 +1,15 @@
+# Fonctionnement 
+.idea/
+.ipynb_checkpoints/
+__pycache__/
+
+# Données
 data/
 labels/
 otherdata/
 otherdata5/
 otherdata3/
+
+# Modèles générés
 runs/
+
